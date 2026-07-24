@@ -1,171 +1,460 @@
-import pygame
 import sys
+import pygame
+
 pygame.init()
 
-WIDTH, HEIGHT = 1000, 700
-CANVAS_WIDTH = 700
-GRID_SIZE = 20
-GRID_WIDTH = CANVAS_WIDTH // GRID_SIZE
-GRID_HEIGHT = HEIGHT // GRID_SIZE
-DARK_BG = (255, 255, 255)
-LIGHT_TEXT = (0, 0, 0)
-ACCENT = (100, 180, 255)
-HIGHLIGHT = (255, 215, 0)
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-RED = (255, 89, 94)
-GREEN = (138, 201, 38)
-BLUE = (25, 130, 196)
-YELLOW = (255, 202, 58)
-PURPLE = (187, 107, 217)
-ORANGE = (255, 158, 74)
-CYAN = (0, 188, 212)
-COLORS = [BLACK, RED, GREEN, BLUE, YELLOW, PURPLE, ORANGE, CYAN, WHITE]
-COLOR_NAMES = ["Черный", "Красный", "Зеленый", "Синий", "Желтый", "Фиолетовый", "Оранжевый", "Бирюзовый", "Белый"]
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("🎨 Заливочка")
+window_width = 1000
+window_height = 700
+canvas_width = 700
+panel_width = window_width - canvas_width
 
-try:
-    title_font = pygame.font.SysFont("arial", 32)
-    header_font = pygame.font.SysFont("arial", 24)
-    text_font = pygame.font.SysFont("arial", 18)
-except:
-    title_font = pygame.font.Font(None, 32)
-    header_font = pygame.font.Font(None, 24)
-    text_font = pygame.font.Font(None, 18)
+cell_size = 20
+grid_width = canvas_width // cell_size
+grid_height = window_height // cell_size
 
-grid = [[WHITE for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
-current_color = BLACK
-draw_mode = True
+white = (255, 255, 255)
+black = (0, 0, 0)
+light_gray = (240, 240, 240)
+gray = (200, 200, 200)
+blue = (100, 180, 255)
+red = (255, 89, 94)
+green = (138, 201, 38)
+yellow = (255, 202, 58)
+purple = (187, 107, 217)
+orange = (255, 158, 74)
+cyan = (0, 188, 212)
 
-UI_ELEMENTS = {
-    'title': (CANVAS_WIDTH + 20, 20),
-    'divider_start': (CANVAS_WIDTH + 20, 70),
-    'divider_end': (WIDTH - 20, 70),
-    'modes_header': (CANVAS_WIDTH + 20, 90),
-    'draw_button': (CANVAS_WIDTH + 30, 130),
-    'fill_button': (CANVAS_WIDTH + 30, 190),
-    'colors_header': (CANVAS_WIDTH + 20, 250),
-    'instructions_header': (CANVAS_WIDTH + 20, 520),
-    'instructions_start': (CANVAS_WIDTH + 30, 560)
-}
+colors = [
+    black,
+    red,
+    green,
+    blue,
+    yellow,
+    purple,
+    orange,
+    cyan,
+    white,
+]
+
+color_names = [
+    "Чёрный",
+    "Красный",
+    "Зелёный",
+    "Синий",
+    "Жёлтый",
+    "Фиолетовый",
+    "Оранжевый",
+    "Бирюзовый",
+    "Белый",
+]
+
+screen = pygame.display.set_mode((window_width, window_height))
+pygame.display.set_caption("Заливка")
+
+title_font = pygame.font.SysFont("arial", 30)
+header_font = pygame.font.SysFont("arial", 22)
+text_font = pygame.font.SysFont("arial", 16)
+
+draw_button = pygame.Rect(canvas_width + 30, 120, 200, 40)
+fill_button = pygame.Rect(canvas_width + 30, 175, 200, 40)
+
+grid = [
+    [white for _ in range(grid_width)]
+    for _ in range(grid_height)
+]
+
+current_color = black
+current_mode = "draw"
+mouse_pressed = False
+last_drawn_cell = None
+
 
 def draw_grid():
-    for y in range(GRID_HEIGHT):
-        for x in range(GRID_WIDTH):
-            rect = pygame.Rect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE, GRID_SIZE)
-            pygame.draw.rect(screen, grid[y][x], rect)
-            pygame.draw.rect(screen, BLACK, rect, 1)
+    for y in range(grid_height):
+        for x in range(grid_width):
+            cell_rect = pygame.Rect(
+                x * cell_size,
+                y * cell_size,
+                cell_size,
+                cell_size,
+            )
+
+            pygame.draw.rect(
+                screen,
+                grid[y][x],
+                cell_rect,
+            )
+            pygame.draw.rect(
+                screen,
+                black,
+                cell_rect,
+                1,
+            )
+
+
+def get_color_rect(color_index):
+    row = color_index // 2
+    column = color_index % 2
+
+    return pygame.Rect(
+        canvas_width + 25 + column * 135,
+        275 + row * 50,
+        125,
+        40,
+    )
+
+
+def draw_mode_buttons():
+    draw_button_color = blue if current_mode == "draw" else gray
+    fill_button_color = blue if current_mode == "fill" else gray
+
+    pygame.draw.rect(
+        screen,
+        draw_button_color,
+        draw_button,
+        border_radius=6,
+    )
+    pygame.draw.rect(
+        screen,
+        black,
+        draw_button,
+        2,
+        border_radius=6,
+    )
+
+    pygame.draw.rect(
+        screen,
+        fill_button_color,
+        fill_button,
+        border_radius=6,
+    )
+    pygame.draw.rect(
+        screen,
+        black,
+        fill_button,
+        2,
+        border_radius=6,
+    )
+
+    draw_text = text_font.render(
+        "Рисование",
+        True,
+        black,
+    )
+    fill_text = text_font.render(
+        "Заливка",
+        True,
+        black,
+    )
+
+    screen.blit(
+        draw_text,
+        (
+            draw_button.centerx - draw_text.get_width() // 2,
+            draw_button.centery - draw_text.get_height() // 2,
+        ),
+    )
+    screen.blit(
+        fill_text,
+        (
+            fill_button.centerx - fill_text.get_width() // 2,
+            fill_button.centery - fill_text.get_height() // 2,
+        ),
+    )
+
+
+def draw_color_palette():
+    for color_index, color in enumerate(colors):
+        color_rect = get_color_rect(color_index)
+
+        if color == current_color:
+            pygame.draw.rect(
+                screen,
+                blue,
+                color_rect,
+                3,
+                border_radius=6,
+            )
+        else:
+            pygame.draw.rect(
+                screen,
+                gray,
+                color_rect,
+                1,
+                border_radius=6,
+            )
+
+        preview_rect = pygame.Rect(
+            color_rect.x + 5,
+            color_rect.y + 5,
+            30,
+            30,
+        )
+
+        pygame.draw.rect(
+            screen,
+            color,
+            preview_rect,
+        )
+        pygame.draw.rect(
+            screen,
+            black,
+            preview_rect,
+            1,
+        )
+
+        name_text = text_font.render(
+            color_names[color_index],
+            True,
+            black,
+        )
+
+        screen.blit(
+            name_text,
+            (color_rect.x + 42, color_rect.y + 11),
+        )
 
 
 def draw_tool_panel():
-    panel_rect = pygame.Rect(CANVAS_WIDTH, 0, WIDTH - CANVAS_WIDTH, HEIGHT)
-    pygame.draw.rect(screen, (240, 240, 240), panel_rect)
-    pygame.draw.line(screen, ACCENT, (CANVAS_WIDTH, 0), (CANVAS_WIDTH, HEIGHT), 2)
-    title = title_font.render("Paint =)", True, ACCENT)
-    screen.blit(title, UI_ELEMENTS['title'])
-    pygame.draw.line(screen, ACCENT, UI_ELEMENTS['divider_start'], UI_ELEMENTS['divider_end'], 1)
-    header = header_font.render("Режимы работы:", True, LIGHT_TEXT)
-    screen.blit(header, UI_ELEMENTS['modes_header'])
-    draw_rect = pygame.Rect(UI_ELEMENTS['draw_button'][0], UI_ELEMENTS['draw_button'][1], 200, 40)
-    color = ACCENT if draw_mode else (200, 200, 200)
-    pygame.draw.rect(screen, color, draw_rect, border_radius=8)
-    pygame.draw.rect(screen, ACCENT, draw_rect, 2, border_radius=8)
-    draw_text = text_font.render("Рисую", True, BLACK)
-    screen.blit(draw_text, (UI_ELEMENTS['draw_button'][0] + 20, UI_ELEMENTS['draw_button'][1] + 12))
-    fill_rect = pygame.Rect(UI_ELEMENTS['fill_button'][0], UI_ELEMENTS['fill_button'][1], 200, 40)
-    color = ACCENT if not draw_mode else (200, 200, 200)
-    pygame.draw.rect(screen, color, fill_rect, border_radius=8)
-    pygame.draw.rect(screen, ACCENT, fill_rect, 2, border_radius=8)
-    fill_text = text_font.render("Закрашиваю", True, BLACK)
-    screen.blit(fill_text, (UI_ELEMENTS['fill_button'][0] + 20, UI_ELEMENTS['fill_button'][1] + 12))
-    header = header_font.render("Цвета:", True, LIGHT_TEXT)
-    screen.blit(header, UI_ELEMENTS['colors_header'])
-    y_offset = UI_ELEMENTS['colors_header'][1] + 40
-    for i, (color, name) in enumerate(zip(COLORS, COLOR_NAMES)):
-        row = i // 2
-        col = i % 2
-        color_rect = pygame.Rect(CANVAS_WIDTH + 30 + col * 120, y_offset + row * 50, 100, 40)
-        if color == current_color:
-            pygame.draw.rect(screen, ACCENT, color_rect, 3, border_radius=6)
-        pygame.draw.rect(screen, color, pygame.Rect(color_rect.x + 5, color_rect.y + 5, 30, 30))
-        name_text = text_font.render(name, True, BLACK)
-        screen.blit(name_text, (color_rect.x + 45, color_rect.y + 12))
-    header = header_font.render("Инструкция:", True, LIGHT_TEXT)
-    screen.blit(header, UI_ELEMENTS['instructions_header'])
+    panel_rect = pygame.Rect(
+        canvas_width,
+        0,
+        panel_width,
+        window_height,
+    )
+
+    pygame.draw.rect(
+        screen,
+        light_gray,
+        panel_rect,
+    )
+    pygame.draw.line(
+        screen,
+        blue,
+        (canvas_width, 0),
+        (canvas_width, window_height),
+        2,
+    )
+
+    title_text = title_font.render(
+        "Заливка",
+        True,
+        black,
+    )
+    screen.blit(
+        title_text,
+        (canvas_width + 20, 20),
+    )
+
+    pygame.draw.line(
+        screen,
+        gray,
+        (canvas_width + 20, 65),
+        (window_width - 20, 65),
+    )
+
+    mode_header = header_font.render(
+        "Режим",
+        True,
+        black,
+    )
+    screen.blit(
+        mode_header,
+        (canvas_width + 20, 80),
+    )
+
+    draw_mode_buttons()
+
+    colors_header = header_font.render(
+        "Цвет",
+        True,
+        black,
+    )
+    screen.blit(
+        colors_header,
+        (canvas_width + 20, 235),
+    )
+
+    draw_color_palette()
+
+    instruction_header = header_font.render(
+        "Управление",
+        True,
+        black,
+    )
+    screen.blit(
+        instruction_header,
+        (canvas_width + 20, 535),
+    )
+
     instructions = [
-        "• Выберите режим работы",
-        "• Выберите цвет",
-        "• Теперь вы можете создать контур",
-        "• Переключиться на заливку",
-        "• Закрасить контур кликом"
+        "Выберите цвет и нарисуйте контур",
+        "Переключитесь в режим заливки",
+        "Нажмите внутри замкнутой области",
     ]
-    y_offset = UI_ELEMENTS['instructions_start'][1]
+
+    y_offset = 570
+
     for instruction in instructions:
-        inst_text = text_font.render(instruction, True, BLACK)
-        screen.blit(inst_text, (UI_ELEMENTS['instructions_start'][0], y_offset))
+        instruction_text = text_font.render(
+            instruction,
+            True,
+            black,
+        )
+        screen.blit(
+            instruction_text,
+            (canvas_width + 25, y_offset),
+        )
         y_offset += 25
 
-def flood_fill(x, y, target_color, replacement_color):
-    if x < 0 or x >= GRID_WIDTH or y < 0 or y >= GRID_HEIGHT:
-        return
-    if grid[y][x] != target_color or grid[y][x] == replacement_color:
-        return
-    grid[y][x] = replacement_color
-    flood_fill(x + 1, y, target_color, replacement_color)
-    flood_fill(x - 1, y, target_color, replacement_color)
-    flood_fill(x, y + 1, target_color, replacement_color)
-    flood_fill(x, y - 1, target_color, replacement_color)
 
-def is_click_in_button(pos, button_pos, width=200, height=40):
-    x, y = pos
-    btn_x, btn_y = button_pos
-    return (btn_x <= x <= btn_x + width and
-            btn_y <= y <= btn_y + height)
+def flood_fill(start_x, start_y, replacement_color):
+    target_color = grid[start_y][start_x]
 
-def get_clicked_color(pos):
-    x, y = pos
-    colors_start_y = UI_ELEMENTS['colors_header'][1] + 40
-    for i in range(len(COLORS)):
-        row = i // 2
-        col = i % 2
-        color_rect = pygame.Rect(CANVAS_WIDTH + 30 + col * 120, colors_start_y + row * 50, 100, 40)
-        if color_rect.collidepoint(x, y):
-            return COLORS[i]
+    if target_color == replacement_color:
+        return
+
+    cells_to_fill = [(start_x, start_y)]
+
+    while cells_to_fill:
+        x, y = cells_to_fill.pop()
+
+        if x < 0 or x >= grid_width:
+            continue
+
+        if y < 0 or y >= grid_height:
+            continue
+
+        if grid[y][x] != target_color:
+            continue
+
+        grid[y][x] = replacement_color
+
+        cells_to_fill.append((x + 1, y))
+        cells_to_fill.append((x - 1, y))
+        cells_to_fill.append((x, y + 1))
+        cells_to_fill.append((x, y - 1))
+
+
+def get_clicked_color(mouse_position):
+    for color_index, color in enumerate(colors):
+        color_rect = get_color_rect(color_index)
+
+        if color_rect.collidepoint(mouse_position):
+            return color
+
     return None
 
-running = True
-clock = pygame.time.Clock()
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            x, y = event.pos
-            if x > CANVAS_WIDTH:
-                if is_click_in_button((x, y), UI_ELEMENTS['draw_button']):
-                    draw_mode = True
-                elif is_click_in_button((x, y), UI_ELEMENTS['fill_button']):
-                    draw_mode = False
-                clicked_color = get_clicked_color((x, y))
-                if clicked_color is not None:
-                    current_color = clicked_color
-            elif x < CANVAS_WIDTH:
-                grid_x, grid_y = x // GRID_SIZE, y // GRID_SIZE
-                if 0 <= grid_x < GRID_WIDTH and 0 <= grid_y < GRID_HEIGHT:
-                    if draw_mode:
-                        grid[grid_y][grid_x] = current_color
-                    else:
-                        target_color = grid[grid_y][grid_x]
-                        if target_color != current_color:
-                            flood_fill(grid_x, grid_y, target_color, current_color)
-    screen.fill(WHITE)
-    canvas_bg = pygame.Rect(0, 0, CANVAS_WIDTH, HEIGHT)
-    pygame.draw.rect(screen, WHITE, canvas_bg)
-    draw_grid()
-    draw_tool_panel()
-    pygame.display.flip()
-    clock.tick(60)
 
-pygame.quit()
-sys.exit()
+def get_grid_cell(mouse_position):
+    mouse_x, mouse_y = mouse_position
+
+    if mouse_x < 0 or mouse_x >= canvas_width:
+        return None
+
+    if mouse_y < 0 or mouse_y >= window_height:
+        return None
+
+    grid_x = mouse_x // cell_size
+    grid_y = mouse_y // cell_size
+
+    return grid_x, grid_y
+
+
+def draw_in_cell(mouse_position):
+    global last_drawn_cell
+
+    clicked_cell = get_grid_cell(mouse_position)
+
+    if clicked_cell is None:
+        return
+
+    if clicked_cell == last_drawn_cell:
+        return
+
+    grid_x, grid_y = clicked_cell
+    grid[grid_y][grid_x] = current_color
+    last_drawn_cell = clicked_cell
+
+
+def handle_panel_click(mouse_position):
+    global current_mode
+    global current_color
+
+    if draw_button.collidepoint(mouse_position):
+        current_mode = "draw"
+        return
+
+    if fill_button.collidepoint(mouse_position):
+        current_mode = "fill"
+        return
+
+    clicked_color = get_clicked_color(mouse_position)
+
+    if clicked_color is not None:
+        current_color = clicked_color
+
+
+def handle_canvas_click(mouse_position):
+    clicked_cell = get_grid_cell(mouse_position)
+
+    if clicked_cell is None:
+        return
+
+    grid_x, grid_y = clicked_cell
+
+    if current_mode == "draw":
+        draw_in_cell(mouse_position)
+    else:
+        flood_fill(
+            grid_x,
+            grid_y,
+            current_color,
+        )
+
+
+def main():
+    global mouse_pressed
+    global last_drawn_cell
+
+    clock = pygame.time.Clock()
+    running = True
+
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button != 1:
+                    continue
+
+                mouse_pressed = True
+
+                if event.pos[0] < canvas_width:
+                    handle_canvas_click(event.pos)
+                else:
+                    handle_panel_click(event.pos)
+
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    mouse_pressed = False
+                    last_drawn_cell = None
+
+            elif event.type == pygame.MOUSEMOTION:
+                if mouse_pressed and current_mode == "draw":
+                    draw_in_cell(event.pos)
+
+        screen.fill(white)
+        draw_grid()
+        draw_tool_panel()
+
+        pygame.display.flip()
+        clock.tick(60)
+
+    pygame.quit()
+    sys.exit()
+
+
+if __name__ == "__main__":
+    main()
